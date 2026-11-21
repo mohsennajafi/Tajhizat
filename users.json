@@ -1,0 +1,43 @@
+{
+ "users": [
+  {
+   "username": "Admin123",
+   "salt": "mwqzhdj7y2zq5mwqzhdj79nicb",
+   "hash": "4381f4e2c01b0cdfb60bd6abd7dcfeb3c5e81ca06b53004f5c074566d1248d2f",
+   "role": "admin",
+   "first": "Mohsen",
+   "last": "Najafi",
+   "position": "مدیر",
+   "active": true,
+   "province": "",
+   "city": "",
+   "center": ""
+  },
+  {
+   "username": "H_salari",
+   "salt": "mwqzc0gygw6l9mwqzc0gyfe6hq",
+   "hash": "9b225752a0992a833255855c9a9b7bdda040c130a0e83162017b47d539e01b63",
+   "active": true,
+   "first": "هاجر",
+   "last": "سالاری",
+   "position": "کارشناس تجهیزات",
+   "province": "هرمزگان",
+   "city": "خمیر",
+   "center": "بیمارستان نیاپور",
+   "role": "user"
+  },
+  {
+   "username": "A_Amini",
+   "salt": "mwqzg7zs7t5b9mwqzg7zsnan7i",
+   "hash": "a794a001f6603b496a51866810946c7332e80d857915b113d22dcff2829233f3",
+   "active": true,
+   "first": "آناهتا",
+   "last": "امینی",
+   "position": "کاردان رایانه",
+   "province": "هرمزگان",
+   "city": "خمیر",
+   "center": "بیمارستان نیاپور",
+   "role": "user"
+  }
+ ]
+}
