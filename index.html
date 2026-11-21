@@ -48,6 +48,10 @@ input:focus,select:focus{outline:2px solid var(--pr2)}
 footer{max-width:920px;margin:0 auto 20px;padding:0 12px}
 .dev{text-align:center;font-size:13px;color:var(--mu)}.dev a{color:var(--pr);text-decoration:none;font-weight:600}
 .ltr{direction:ltr;unicode-bidi:embed}
+.ov{position:fixed;inset:0;z-index:50;background:linear-gradient(135deg,var(--pr),var(--pr2));display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.ov .card{width:100%;max-width:380px;margin:0}
+.ub{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:8px;font-size:13px;flex-wrap:wrap}
+.ub button{border:1px solid #fff9;background:#fff2;color:#fff;border-radius:99px;padding:1px 12px;font:inherit;cursor:pointer}
 #prt{display:none}
 @media print{
  @page{size:landscape;margin:12mm}
@@ -61,9 +65,9 @@ footer{max-width:920px;margin:0 auto 20px;padding:0 12px}
 </style>
 </head>
 <body>
-<header><h1>ثبت تجهیزات و سیستم‌ها</h1><p>مدیریت دارایی‌ها و سیستم‌های مراکز</p></header>
+<header><h1>ثبت تجهیزات و سیستم‌ها</h1><p>مدیریت دارایی‌ها و سیستم‌های مراکز</p><div class="ub" id="ubar"></div></header>
 <main>
-<div class="tabs"><button id="t-eq" class="on">🛠️ تجهیزات</button><button id="t-sys">💻 سیستم‌ها</button></div>
+<div class="tabs"><button id="t-eq" class="on">🛠️ تجهیزات</button><button id="t-sys">💻 سیستم‌ها</button><button id="t-users" style="display:none">👥 کاربران</button></div>
 <div id="view"></div>
 </main>
 <footer><div class="card dev">
@@ -71,6 +75,7 @@ footer{max-width:920px;margin:0 auto 20px;padding:0 12px}
 ✉️ <a class="ltr" href="mailto:Mohsen.najafi.najafi@Gmail.com">Mohsen.najafi.najafi@Gmail.com</a><br>
 📞 <a class="ltr" href="tel:+989177662400">۰۰۹۸۹۱۷۷۶۶۲۴۰۰</a>
 </div></footer>
+<div id="login" class="ov" style="display:none"></div>
 <div id="prt"></div>
 <script>
 const ST=[["active","فعال"],["inactive","غیرفعال"]];
@@ -102,22 +107,23 @@ function load(){
  }catch(e){}
  return blank();
 }
-let S=load(),cur="eq",editId=null,newC=false,editCid=null,q="";
+let S=load(),cur="eq",editId=null,newC=false,editCid=null,q="",ME=null,U=[],editU=null;
 function save(){try{localStorage.setItem("eqreg2",JSON.stringify(S))}catch(e){}}
 function esc(v){return String(v==null?"":v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function stLabel(v){return v==="inactive"?"غیرفعال":"فعال"}
 function val(id){return document.getElementById(id).value.trim()}
 function cLabel(c){return c.province+" / "+c.city+" / "+c.center}
-function curCenter(){return S.centers.find(x=>x.id===S.sel[cur])}
+function curCenter(){return visibleCenters().find(x=>x.id===S.sel[cur])}
 function field(f,v){
  const id="f_"+f[0];
  if(f[2]==="st")return '<div><label>'+f[1]+'</label><select id="'+id+'">'+ST.map(s=>'<option value="'+s[0]+'"'+((v||"active")===s[0]?" selected":"")+'>'+s[1]+'</option>').join("")+'</select></div>';
  return '<div><label>'+f[1]+'</label><input id="'+id+'" type="'+(f[2]==="number"?"number":"text")+'"'+(f[2]==="number"?' inputmode="numeric"':"")+' value="'+esc(v)+'"></div>';
 }
 function render(){
+ if(cur==="users"){renderUsers();return}
  const c=CFG[cur];
- ["eq","sys"].forEach(t=>{document.getElementById("t-"+t).className=t===cur?"on":""});
- if(!curCenter())S.sel[cur]=S.centers.length?S.centers[0].id:null;
+ ["eq","sys","users"].forEach(t=>{document.getElementById("t-"+t).className=t===cur?"on":""});
+ if(!curCenter()){const v=visibleCenters();S.sel[cur]=v.length?v[0].id:null}
  const ctr=curCenter();
  let h="";
  if(!ctr||newC||editCid){
@@ -128,14 +134,14 @@ function render(){
  }else{
   const mine=S.items[cur].filter(i=>i.cid===ctr.id),act=mine.filter(i=>i.status!=="inactive").length;
   const allN=S.items[cur].length,allA=S.items[cur].filter(i=>i.status!=="inactive").length;
-  h+='<div class="card"><label>مرکز فعال</label><select onchange="selC(this.value)">'+S.centers.map(x=>'<option value="'+x.id+'"'+(x.id===ctr.id?" selected":"")+'>'+esc(cLabel(x))+'</option>').join("")+'</select>'+
-   '<div class="row"><button class="btn s" onclick="newC=true;render()">➕ مرکز جدید</button><button class="btn s" onclick="editCid=S.sel[cur];render()">✏️ ویرایش مرکز</button><button class="btn d" onclick="delCenter()">🗑️ حذف مرکز</button></div></div>';
-  h+='<div class="card"><h2>📊 آمار '+c.title+' این مرکز</h2><div class="stats"><div class="tile"><b>'+mine.length+'</b><span>کل</span></div><div class="tile a"><b>'+act+'</b><span>فعال</span></div><div class="tile i"><b>'+(mine.length-act)+'</b><span>غیرفعال</span></div></div><div class="note">همهٔ مراکز: '+S.centers.length+' مرکز، '+allN+' مورد ('+allA+' فعال، '+(allN-allA)+' غیرفعال)</div></div>';
+  h+='<div class="card"><label>مرکز فعال</label><select onchange="selC(this.value)">'+visibleCenters().map(x=>'<option value="'+x.id+'"'+(x.id===ctr.id?" selected":"")+'>'+esc(cLabel(x))+'</option>').join("")+'</select>'+
+   (ADM()?'<div class="row"><button class="btn s" onclick="newC=true;render()">➕ مرکز جدید</button><button class="btn s" onclick="editCid=S.sel[cur];render()">✏️ ویرایش مرکز</button><button class="btn d" onclick="delCenter()">🗑️ حذف مرکز</button></div>':"")+'</div>';
+  h+='<div class="card"><h2>📊 آمار '+c.title+' این مرکز</h2><div class="stats"><div class="tile"><b>'+mine.length+'</b><span>کل</span></div><div class="tile a"><b>'+act+'</b><span>فعال</span></div><div class="tile i"><b>'+(mine.length-act)+'</b><span>غیرفعال</span></div></div>'+(ADM()?'<div class="note">همهٔ مراکز: '+S.centers.length+' مرکز، '+allN+' مورد ('+allA+' فعال، '+(allN-allA)+' غیرفعال)</div>':"")+'</div>';
   const v=editId?(S.items[cur].find(i=>i.id===editId)||{}):{};
   h+='<div class="card"><h2>'+(editId?"ویرایش":"ثبت")+' '+(cur==="eq"?"دستگاه":"سیستم")+'</h2><div class="grid">'+c.f.map(f=>field(f,v[f[0]])).join("")+'</div><div class="row"><button class="btn" onclick="saveItem()">'+(editId?"ذخیره ویرایش":"ثبت")+'</button>'+(editId?'<button class="btn s" onclick="editId=null;render()">انصراف</button>':"")+'</div></div>';
-  h+='<div class="card"><h2 style="margin:0 0 6px">فهرست ('+mine.length+')</h2><div class="row" style="margin:0 0 10px"><button class="btn x" onclick="exportX(false)">⬇️ اکسل این مرکز</button><button class="btn x" onclick="exportX(true)">⬇️ اکسل همهٔ مراکز</button><button class="btn s" onclick="document.getElementById(\'imp\').click()">⬆️ ورود از اکسل</button><button class="btn s" onclick="printX()">🖨️ PDF / چاپ</button></div><input id="imp" type="file" accept=".xlsx,.xls" hidden onchange="importX(this)"><input id="q" placeholder="🔍 جستجو..." value="'+esc(q)+'" oninput="q=this.value;renderList()"><div id="lst"></div></div>';
+  h+='<div class="card"><h2 style="margin:0 0 6px">فهرست ('+mine.length+')</h2><div class="row" style="margin:0 0 10px"><button class="btn x" onclick="exportX(false)">⬇️ اکسل این مرکز</button>'+(ADM()?'<button class="btn x" onclick="exportX(true)">⬇️ اکسل همهٔ مراکز</button>':"")+'<button class="btn s" onclick="document.getElementById(\'imp\').click()">⬆️ ورود از اکسل</button><button class="btn s" onclick="printX()">🖨️ PDF / چاپ</button></div><input id="imp" type="file" accept=".xlsx,.xls" hidden onchange="importX(this)"><input id="q" placeholder="🔍 جستجو..." value="'+esc(q)+'" oninput="q=this.value;renderList()"><div id="lst"></div></div>';
  }
- h+='<div class="card"><h2>💾 پشتیبان‌گیری و بازیابی</h2><div class="row" style="margin-top:0"><button class="btn" onclick="backupX()">⬇️ دانلود پشتیبان کل اطلاعات</button><button class="btn s" onclick="document.getElementById(\'rst\').click()">⬆️ بازیابی از پشتیبان</button></div><input id="rst" type="file" accept=".json,application/json" hidden onchange="restoreX(this)"><div class="note">پشتیبان شامل همهٔ مراکز، تجهیزات و سیستم‌هاست. بازیابی، اطلاعات فعلی را جایگزین می‌کند.</div></div>';
+ if(ADM())h+='<div class="card"><h2>💾 پشتیبان‌گیری و بازیابی</h2><div class="row" style="margin-top:0"><button class="btn" onclick="backupX()">⬇️ دانلود پشتیبان کل اطلاعات</button><button class="btn s" onclick="document.getElementById(\'rst\').click()">⬆️ بازیابی از پشتیبان</button></div><input id="rst" type="file" accept=".json,application/json" hidden onchange="restoreX(this)"><div class="note">پشتیبان شامل همهٔ مراکز، تجهیزات و سیستم‌هاست. بازیابی، اطلاعات فعلی را جایگزین می‌کند.</div></div>';
  document.getElementById("view").innerHTML=h;
  renderList();
 }
@@ -214,7 +220,7 @@ function importX(inp){
     if(!o[c.main])return;
     let rc={province:String(r["استان"]||"").trim(),city:String(r["شهرستان"]||"").trim(),center:String(r["نام مرکز"]||"").trim()};
     let m;
-    if(rc.center){
+    if(rc.center&&ADM()){
      m=S.centers.find(x=>x.province===rc.province&&x.city===rc.city&&x.center===rc.center);
      if(!m){m=Object.assign({id:uid()},rc);S.centers.push(m)}
     }else if(here)m=here;else return;
@@ -255,9 +261,115 @@ function restoreX(inp){
  };
  r.readAsText(f);
 }
+const ADM=()=>!!ME&&ME.role==="admin";
+function visibleCenters(){return ADM()?S.centers:S.centers.filter(x=>ME&&x.id===ME.cid)}
+function nd(s){return String(s).replace(/[۰-۹]/g,d=>"۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d))}
+const enc=new TextEncoder();
+function hex(b){return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")}
+async function hashPw(pw,salt){
+ const k=await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveBits"]);
+ return hex(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:enc.encode(salt),iterations:100000},k,256));
+}
+function saveUsers(){try{localStorage.setItem("eqreg_udraft",JSON.stringify({users:U}))}catch(e){}}
+async function loadUsers(){
+ let draft=null,remote=null,cached=null;
+ try{const d=localStorage.getItem("eqreg_udraft");if(d)draft=JSON.parse(d)}catch(e){}
+ try{
+  const r=await fetch("users.json?t="+Date.now(),{cache:"no-store"});
+  if(r.ok){remote=await r.json();try{localStorage.setItem("eqreg_ucache",JSON.stringify(remote))}catch(e){}}
+ }catch(e){}
+ if(!remote){try{const c=localStorage.getItem("eqreg_ucache");if(c)cached=JSON.parse(c)}catch(e){}}
+ const src=draft||remote||cached;
+ U=src&&Array.isArray(src.users)?src.users:[];
+}
+async function boot(){
+ await loadUsers();
+ let sid=null;try{sid=localStorage.getItem("eqreg_sess")}catch(e){}
+ const u=U.find(x=>x.username===sid&&x.active!==false);
+ if(u)enter(u);else showLogin();
+}
+function showLogin(msg){
+ const o=document.getElementById("login");o.style.display="flex";
+ document.getElementById("ubar").innerHTML="";
+ document.getElementById("t-users").style.display="none";
+ if(!U.length){
+  o.innerHTML='<div class="card"><h2>🔐 ایجاد حساب مدیر</h2><div class="note" style="margin:0 0 8px">اولین استفاده: حساب مدیر را تعریف کنید.</div><label>نام کاربری مدیر (حروف و عدد انگلیسی)</label><input id="l_u" autocomplete="off"><label>رمز عبور (حداقل ۴ کاراکتر)</label><input id="l_p" type="password" autocomplete="new-password"><label>نام و نام خانوادگی</label><input id="l_n"><div class="row"><button class="btn" onclick="setupAdmin()">ایجاد و ورود</button></div></div>';
+ }else{
+  o.innerHTML='<div class="card"><h2>🔐 ورود به برنامه</h2><label>نام کاربری</label><input id="l_u" autocomplete="username"><label style="margin-top:8px">رمز عبور</label><input id="l_p" type="password" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')doLogin()"><div class="note" style="color:var(--dg)">'+(msg||"")+'</div><div class="row"><button class="btn" onclick="doLogin()">ورود</button></div></div>';
+ }
+}
+async function setupAdmin(){
+ const un=nd(val("l_u")),pw=nd(document.getElementById("l_p").value),nm=val("l_n");
+ if(!/^[A-Za-z0-9_.@-]+$/.test(un)||pw.length<4||!nm){alert("نام کاربری (حروف و عدد انگلیسی)، رمز (حداقل ۴ کاراکتر) و نام را وارد کنید.");return}
+ try{
+  const salt=uid()+uid();
+  U=[{username:un,salt:salt,hash:await hashPw(pw,salt),role:"admin",first:nm,last:"",position:"مدیر",active:true}];
+ }catch(e){alert("برای ورود، برنامه باید با آدرس https باز شود.");return}
+ saveUsers();enter(U[0]);
+}
+async function doLogin(){
+ const un=nd(val("l_u")),pw=nd(document.getElementById("l_p").value);
+ const u=U.find(x=>x.username===un);
+ try{
+  if(!u||u.active===false||await hashPw(pw,u.salt)!==u.hash){showLogin("نام کاربری یا رمز عبور اشتباه است.");return}
+ }catch(e){alert("برای ورود، برنامه باید با آدرس https باز شود.");return}
+ enter(u);
+}
+function enter(u){
+ ME=Object.assign({},u);
+ try{localStorage.setItem("eqreg_sess",u.username)}catch(e){}
+ if(u.role!=="admin"){
+  let m=S.centers.find(x=>x.province===u.province&&x.city===u.city&&x.center===u.center);
+  if(!m){m={id:uid(),province:u.province||"",city:u.city||"",center:u.center||""};S.centers.push(m)}
+  ME.cid=m.id;S.sel.eq=m.id;S.sel.sys=m.id;save();
+ }
+ const o=document.getElementById("login");o.style.display="none";o.innerHTML="";
+ document.getElementById("t-users").style.display=u.role==="admin"?"":"none";
+ document.getElementById("ubar").innerHTML='👤 '+esc((u.first+" "+(u.last||"")).trim())+(u.position?" — "+esc(u.position):"")+' <button onclick="logout()">خروج</button>';
+ cur="eq";editId=null;newC=false;editCid=null;editU=null;q="";render();
+}
+function logout(){try{localStorage.removeItem("eqreg_sess")}catch(e){}ME=null;showLogin()}
+function renderUsers(){
+ ["eq","sys","users"].forEach(t=>{document.getElementById("t-"+t).className=t===cur?"on":""});
+ const ed=editU!==null,e=ed?(U.find(x=>x.username===editU)||{}):{};
+ const fl=[["u_un","نام کاربری (حروف و عدد انگلیسی، مثلاً 123321)",e.username,ed],["u_pw","رمز عبور"+(ed?" (خالی = بدون تغییر)":""),"",false],["u_fn","نام",e.first,false],["u_ln","نام خانوادگی",e.last,false],["u_ps","سمت",e.position,false],["u_pv","استان",e.province,false],["u_ct","شهرستان",e.city,false],["u_cn","نام مرکز",e.center,false]];
+ let h='<div class="card"><h2>'+(ed?"ویرایش کاربر":"تعریف کاربر جدید")+'</h2><div class="grid">'+fl.map(x=>'<div><label>'+x[1]+'</label><input id="'+x[0]+'" value="'+esc(x[2])+'"'+(x[3]?" readonly":"")+' autocomplete="off"></div>').join("")+
+  '<div><label>نقش</label><select id="u_rl"><option value="user"'+(e.role!=="admin"?" selected":"")+'>کاربر (فقط مرکز خودش)</option><option value="admin"'+(e.role==="admin"?" selected":"")+'>مدیر (همهٔ مراکز)</option></select></div></div><div class="row"><button class="btn" onclick="saveUser()">'+(ed?"ذخیره":"➕ تعریف کاربر")+'</button>'+(ed?'<button class="btn s" onclick="editU=null;render()">انصراف</button>':"")+'</div></div>';
+ h+='<div class="card"><div class="bar"><h2 style="margin:0">کاربران ('+U.length+')</h2><button class="btn x" onclick="downloadUsers()">⬇️ دانلود users.json</button></div><div class="note">بعد از هر تغییر، فایل users.json را دانلود کنید و در مخزن GitHub (کنار index.html) جایگزین کنید تا برای دستگاه‌های کاربران اعمال شود.</div>';
+ U.forEach(u=>{
+  const un=esc(u.username);
+  h+='<div class="item"><b>'+esc((u.first+" "+(u.last||"")).trim())+'</b> <span class="chip '+(u.active===false?"i":"a")+'">'+(u.active===false?"غیرفعال":"فعال")+'</span>'+(u.role==="admin"?' <span class="chip a">مدیر</span>':"")+'<small class="ltr">'+un+'</small><small>'+esc([u.position,u.province,u.city,u.center].filter(Boolean).join(" • "))+'</small><div class="row"><button class="btn s" onclick="editUser(\''+un+'\')">✏️ ویرایش</button>'+(u.username!==ME.username?'<button class="btn s" onclick="toggleU(\''+un+'\')">'+(u.active===false?"فعال‌سازی":"غیرفعال‌سازی")+'</button><button class="btn d" onclick="delU(\''+un+'\')">🗑️ حذف</button>':"")+'</div></div>';
+ });
+ h+='</div>';
+ document.getElementById("view").innerHTML=h;
+}
+function editUser(un){editU=un;renderUsers();window.scrollTo({top:0,behavior:"smooth"})}
+function toggleU(un){const u=U.find(x=>x.username===un);if(u&&un!==ME.username){u.active=u.active===false;saveUsers();renderUsers()}}
+function delU(un){if(un!==ME.username&&confirm("کاربر «"+un+"» حذف شود؟")){U=U.filter(x=>x.username!==un);saveUsers();renderUsers()}}
+async function saveUser(){
+ const un=nd(val("u_un")),pw=nd(document.getElementById("u_pw").value);
+ const o={first:val("u_fn"),last:val("u_ln"),position:val("u_ps"),province:val("u_pv"),city:val("u_ct"),center:val("u_cn"),role:document.getElementById("u_rl").value};
+ const isNew=editU===null;
+ if(!isNew&&editU===ME.username)o.role="admin";
+ if(!/^[A-Za-z0-9_.@-]+$/.test(un)){alert("نام کاربری باید فقط حروف و عدد انگلیسی باشد.");return}
+ if(!o.first||(o.role!=="admin"&&(!o.province||!o.city||!o.center))){alert("نام و اطلاعات مرکز (استان، شهرستان، نام مرکز) الزامی است.");return}
+ if(isNew&&pw.length<4){alert("رمز عبور حداقل ۴ کاراکتر باشد.");return}
+ if(isNew&&U.some(x=>x.username===un)){alert("این نام کاربری قبلاً تعریف شده است.");return}
+ try{
+  if(isNew){const salt=uid()+uid();U.push(Object.assign({username:un,salt:salt,hash:await hashPw(pw,salt),active:true},o))}
+  else{const u=U.find(x=>x.username===editU);Object.assign(u,o);if(pw){u.salt=uid()+uid();u.hash=await hashPw(pw,u.salt)}}
+ }catch(err){alert("خطا در رمزنگاری؛ برنامه را با آدرس https باز کنید.");return}
+ editU=null;saveUsers();renderUsers();
+}
+function downloadUsers(){
+ const b=new Blob([JSON.stringify({users:U},null,1)],{type:"application/json"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="users.json";
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+document.getElementById("t-users").onclick=()=>{cur="users";editU=null;renderUsers()};
 document.getElementById("t-eq").onclick=()=>{cur="eq";editId=null;newC=false;editCid=null;q="";render()};
 document.getElementById("t-sys").onclick=()=>{cur="sys";editId=null;newC=false;editCid=null;q="";render()};
-render();
+boot();
 if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
 </script>
 </body>
